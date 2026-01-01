@@ -481,6 +481,24 @@ static void rp23xx_update_buffer_control(struct rp23xx_ep_s *privep,
   if (or_mask)
     {
       value |= or_mask;
+
+      /* Per RP2350 datasheet section 4.1.2.5.1 (Concurrent access):
+       * When setting AVAIL bit, first write WITHOUT it, wait 12 cycles,
+       * then write WITH it. This prevents race between CPU and USB controller.
+       */
+
+      if (or_mask & RP23XX_USBCTRL_DPSRAM_EP_BUFF_CTRL_AVAIL)
+        {
+          putreg32(value & ~RP23XX_USBCTRL_DPSRAM_EP_BUFF_CTRL_AVAIL,
+                   privep->buf_ctrl);
+
+          /* Wait 12 cycles at 150MHz = ~80ns */
+
+          for (volatile int i = 0; i < 12; i++)
+            {
+              __asm__ volatile ("nop");
+            }
+        }
     }
 
   putreg32(value, privep->buf_ctrl);
