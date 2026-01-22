@@ -36,6 +36,7 @@
 #include <nuttx/nuttx.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/wqueue.h>
+#include <nuttx/semaphore.h>
 #include <nuttx/net/bluetooth.h>
 #include <nuttx/wireless/bluetooth/bt_driver.h>
 #include <nuttx/wireless/bluetooth/bt_uart.h>
@@ -50,6 +51,14 @@
 
 #define BLE_BUF_SIZE      1024
 
+/* Send timeout in milliseconds */
+
+#define BLE_SEND_TIMEOUT_MS  100
+
+/* Max number of retries when VHCI is not ready */
+
+#define BLE_SEND_MAX_RETRIES 50
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -57,6 +66,7 @@
 struct esp32s3_ble_priv_s
 {
   struct bt_driver_s drv;         /* NuttX BT/BLE driver data */
+  sem_t send_sem;                 /* Semaphore for send readiness */
 };
 
 /****************************************************************************
@@ -102,6 +112,7 @@ static esp_vhci_host_callback_t vhci_host_cb =
  *
  * Description:
  *   If the controller could send HCI command will callback this function.
+ *   Wake up any threads waiting to send.
  *
  * Input Parameters:
  *   None
@@ -113,6 +124,11 @@ static esp_vhci_host_callback_t vhci_host_cb =
 
 static void esp32s3_ble_send_ready(void)
 {
+  struct esp32s3_ble_priv_s *priv = &g_ble_priv;
+
+  /* Wake up any threads waiting to send */
+
+  nxsem_post(&priv->send_sem);
 }
 
 /****************************************************************************
@@ -137,6 +153,8 @@ static int esp32s3_ble_recv_cb(uint8_t *data, uint16_t len)
   enum bt_buf_type_e type;
   struct esp32s3_ble_priv_s *priv = &g_ble_priv;
 
+  wlinfo("esp32s3_ble_recv_cb: len=%u hdr=0x%02x\n", len, data[0]);
+
   switch (data[0])
     {
       case H4_EVT:
@@ -149,6 +167,7 @@ static int esp32s3_ble_recv_cb(uint8_t *data, uint16_t len)
         type = BT_ISO_IN;
         break;
       default:
+        wlerr("esp32s3_ble_recv_cb: invalid type 0x%02x\n", data[0]);
         valid = false;
         break;
     }
@@ -194,7 +213,11 @@ static int esp32s3_ble_send(struct bt_driver_s *drv,
                             enum bt_buf_type_e type,
                             void *data, size_t len)
 {
+  struct esp32s3_ble_priv_s *priv = &g_ble_priv;
   uint8_t *hdr = (uint8_t *)data - drv->head_reserve;
+  int retries = 0;
+
+  wlinfo("esp32s3_ble_send: type=%d len=%zu\n", type, len);
 
   if ((len + H4_HEADER_SIZE) > BLE_BUF_SIZE)
     {
@@ -218,10 +241,25 @@ static int esp32s3_ble_send(struct bt_driver_s *drv,
       return -EINVAL;
     }
 
-  if (esp32s3_vhci_host_check_send_available())
+  /* Wait until VHCI is ready to accept the packet */
+
+  while (!esp32s3_vhci_host_check_send_available())
     {
-      esp32s3_vhci_host_send_packet(hdr, len + drv->head_reserve);
+      if (++retries > BLE_SEND_MAX_RETRIES)
+        {
+          wlerr("ERROR: VHCI send not available after %d retries\n", retries);
+          return -ETIMEDOUT;
+        }
+
+      wlinfo("esp32s3_ble_send: VHCI not ready, retry %d\n", retries);
+
+      /* Wait for the send_ready callback with timeout */
+
+      nxsem_tickwait(&priv->send_sem, MSEC2TICK(BLE_SEND_TIMEOUT_MS));
     }
+
+  wlinfo("esp32s3_ble_send: sending packet\n");
+  esp32s3_vhci_host_send_packet(hdr, len + drv->head_reserve);
 
   return len;
 }
@@ -284,6 +322,10 @@ static int esp32s3_ble_open(struct bt_driver_s *drv)
 int esp32s3_ble_initialize(void)
 {
   int ret;
+
+  /* Initialize the send semaphore */
+
+  nxsem_init(&g_ble_priv.send_sem, 0, 0);
 
   ret = esp32s3_bt_controller_init();
   if (ret)

@@ -2079,6 +2079,16 @@ int bt_start_advertising(uint8_t type, FAR const struct bt_eir_s *ad,
   FAR struct bt_hci_cp_le_set_adv_parameters_s *set_param;
   int i;
 
+  /* If advertising is already enabled, stop it first.
+   * We cannot change advertising parameters while advertising is active.
+   */
+
+  if (g_btdev.adv_enable)
+    {
+      wlinfo("Stopping existing advertising before restart\n");
+      bt_stop_advertising();
+    }
+
   if (ad == NULL)
     {
       goto send_scan_rsp;
@@ -2144,6 +2154,10 @@ send_scan_rsp:
   bt_hci_cmd_send(BT_HCI_OP_LE_SET_SCAN_RSP_DATA, buf);
 
 send_set_param:
+  /* Use public address for advertising (type 0x00).
+   * ESP32S3 may not support random address advertising.
+   */
+
   buf = bt_hci_cmd_create(BT_HCI_OP_LE_SET_ADV_PARAMETERS,
                           sizeof(*set_param));
   if (buf == NULL)
@@ -2155,9 +2169,10 @@ send_set_param:
   set_param = bt_buf_extend(buf, sizeof(*set_param));
 
   memset(set_param, 0, sizeof(*set_param));
-  set_param->min_interval = BT_HOST2LE16(300);
-  set_param->max_interval = BT_HOST2LE16(300);
+  set_param->min_interval = BT_HOST2LE16(160);  /* 100ms */
+  set_param->max_interval = BT_HOST2LE16(320);  /* 200ms */
   set_param->type         = type;
+  set_param->own_addr_type = 0x00;  /* Use public address */
   set_param->channel_map  = 0x07;
 
   bt_hci_cmd_send(BT_HCI_OP_LE_SET_ADV_PARAMETERS, buf);

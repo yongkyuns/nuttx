@@ -143,6 +143,11 @@ static const struct bt_eir_s g_ad[] =
     },
   },
   {
+    .len  = 6,  /* 1 (type) + 5 (NuttX) */
+    .type = BT_EIR_NAME_COMPLETE,
+    .data = "NuttX",
+  },
+  {
     .len  = 0,
     .type = 0,
     .data = "",
@@ -152,9 +157,9 @@ static const struct bt_eir_s g_ad[] =
 static const struct bt_eir_s g_sd[] =
 {
   {
-    .len  = 16,
+    .len  = 6,  /* 1 (type) + 5 (NuttX) */
     .type = BT_EIR_NAME_COMPLETE,
-    .data = CONFIG_DEVICE_LOCAL_NAME,
+    .data = "NuttX",
   },
   {
     .len  = 0,
