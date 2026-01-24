@@ -48,7 +48,7 @@
 #  include "esp32s3_board_wlan.h"
 #endif
 
-#ifdef CONFIG_ESPRESSIF_BLE
+#if defined(CONFIG_ESPRESSIF_BLE) && !defined(CONFIG_ESP32S3_NIMBLE_HCI)
 #  include "esp32s3_ble.h"
 #endif
 
@@ -487,7 +487,11 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESPRESSIF_BLE
+#if defined(CONFIG_ESPRESSIF_BLE) && !defined(CONFIG_ESP32S3_NIMBLE_HCI)
+  /* When using NimBLE VHCI, the BT controller is initialized by NimBLE's
+   * ble_transport_ll_init() instead of here.
+   */
+
   ret = esp32s3_ble_initialize();
   if (ret)
     {

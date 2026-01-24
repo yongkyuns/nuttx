@@ -190,7 +190,12 @@ CHIP_CSRCS += esp32s3_wifi_adapter.c
 endif
 
 ifeq ($(CONFIG_ESPRESSIF_BLE),y)
-CHIP_CSRCS += esp32s3_ble_adapter.c esp32s3_ble.c
+CHIP_CSRCS += esp32s3_ble_adapter.c
+# When using NimBLE VHCI transport, skip esp32s3_ble.c (native BT stack driver)
+# The VHCI transport is in nuttx-apps/wireless/bluetooth/nimble
+ifneq ($(CONFIG_ESP32S3_NIMBLE_HCI),y)
+CHIP_CSRCS += esp32s3_ble.c
+endif
 EXTRA_LIBS += -lbtbb -lbtdm_app
 endif
 

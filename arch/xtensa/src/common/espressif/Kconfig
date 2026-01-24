@@ -2254,4 +2254,14 @@ config ESPRESSIF_BLE_INTERRUPT_SAVE_STATUS
 	---help---
 		Number of interrupt save status variables to keep track. Increase it if any related bug is found.
 
+config ESP32S3_NIMBLE_HCI
+	bool "NimBLE VHCI Transport"
+	default n
+	depends on ESPRESSIF_BLE && ARCH_CHIP_ESP32S3 && NIMBLE
+	---help---
+		Enable NimBLE VHCI transport layer for ESP32S3.
+		This provides a direct VHCI interface between NimBLE host
+		and the ESP32S3 BLE controller, bypassing the HCI socket
+		layer which is incompatible with ESP32S3's VHCI buffering.
+
 endmenu # BLE Configuration

@@ -348,6 +348,14 @@ int esp32s3_ble_initialize(void)
       return ERROR;
     }
 
+  /* NOTE: ble_acl_data_cb_register was tried but causes crashes due to
+   * callback signature mismatch. ACL data should come through VHCI.
+   * If ACL data is not being received, the issue may be in controller
+   * configuration or the host stack.
+   */
+
+  wlinfo("BLE initialized, VHCI callback registered\n");
+
   ret = bt_driver_register(&g_ble_priv.drv);
   if (ret < 0)
     {
