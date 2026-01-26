@@ -84,6 +84,10 @@
 #include <nuttx/video/fb.h>
 #endif
 
+#ifdef CONFIG_ESP32S3_CAMERA
+#include "esp32s3_camera.h"
+#endif
+
 #ifdef CONFIG_ESPRESSIF_EFUSE
 #  include "espressif/esp_efuse.h"
 #endif
@@ -183,6 +187,14 @@ int esp32s3_bringup(void)
     defined(CONFIG_ESPRESSIF_I2S1)
   bool i2s_enable_tx;
   bool i2s_enable_rx;
+#endif
+
+  printf("=== ESP32S3 BRINGUP START ===\n");
+
+#ifdef CONFIG_ESP32S3_CAMERA
+  printf("CAMERA CONFIG: ENABLED\n");
+#else
+  printf("CAMERA CONFIG: DISABLED\n");
 #endif
 
 #if defined(CONFIG_ESP32S3_SPIRAM) && \
@@ -538,6 +550,56 @@ int esp32s3_bringup(void)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize LCD.\n");
     }
+#endif
+
+#ifdef CONFIG_ESP32S3_CAMERA
+  /* Initialize camera driver with Freenove ESP32-S3-WROOM CAM pins */
+
+  printf("[BRINGUP] CAMERA: Initializing ESP32-S3 camera driver...\n");
+  syslog(LOG_INFO, "CAMERA: Initializing ESP32-S3 camera driver...\n");
+
+  {
+    struct esp32s3_camera_config_s cam_config =
+    {
+      .pins =
+      {
+        /* Freenove ESP32-S3-WROOM CAM (ESP32S3_EYE config) */
+        .pin_pwdn = -1,    /* Not connected on this board */
+        .pin_reset = -1,   /* Not connected */
+        .pin_xclk = 15,
+        .pin_siod = 4,     /* I2C SDA */
+        .pin_sioc = 5,     /* I2C SCL */
+        .pin_d7 = 16,      /* Y9 */
+        .pin_d6 = 17,      /* Y8 */
+        .pin_d5 = 18,      /* Y7 */
+        .pin_d4 = 12,      /* Y6 */
+        .pin_d3 = 10,      /* Y5 */
+        .pin_d2 = 8,       /* Y4 */
+        .pin_d1 = 9,       /* Y3 */
+        .pin_d0 = 11,      /* Y2 */
+        .pin_vsync = 6,
+        .pin_href = 7,
+        .pin_pclk = 13,
+      },
+      .xclk_freq_hz = 10000000,  /* 10 MHz XCLK (per Freenove docs) */
+      .pixel_format = ESP32S3_CAM_PIXFMT_RGB565,  /* OV3660 outputs RGB565 */
+      .frame_size = ESP32S3_CAM_FRAMESIZE_QVGA,  /* 320x240 */
+      .jpeg_quality = 12,
+      .fb_count = 1,
+      .i2c_bus = 0,
+    };
+
+    ret = esp32s3_camera_initialize(&cam_config);
+    if (ret < 0)
+      {
+        printf("[BRINGUP] ERROR: Failed to initialize camera: %d\n", ret);
+        syslog(LOG_ERR, "ERROR: Failed to initialize camera: %d\n", ret);
+      }
+    else
+      {
+        printf("[BRINGUP] Camera initialized successfully!\n");
+      }
+  }
 #endif
 
 #ifdef CONFIG_NET_LAN9250

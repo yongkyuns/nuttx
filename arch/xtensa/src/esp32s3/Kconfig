@@ -931,6 +931,17 @@ config ESP32S3_LCD
 	---help---
 		LCD controller that outputs parallel data and supports RGB interface.
 
+config ESP32S3_CAMERA
+	bool "Camera (DVP Interface)"
+	default n
+	select ESP32S3_DMA
+	select ESP32S3_I2C
+	---help---
+		Camera DVP interface using the LCD_CAM peripheral in camera mode.
+		This driver supports OV2640 and compatible camera sensors connected
+		via the DVP (Digital Video Port) parallel interface.
+		Requires I2C for sensor configuration and DMA for data transfer.
+
 config ESP32S3_AES_ACCELERATOR
 	bool "AES Accelerator"
 	default n
