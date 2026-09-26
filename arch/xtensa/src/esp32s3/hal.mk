@@ -288,3 +288,11 @@ ifeq ($(CONFIG_ESPRESSIF_SIMPLE_BOOT),y)
 endif
 
 CFLAGS += ${DEFINE_PREFIX}ESP_PLATFORM=1
+
+# The NuttX Wi-Fi Kconfig symbol is CONFIG_ESPRESSIF_WIFI, while the
+# vendored ESP-HAL gates wifi_module_enable/disable() on the ESP-IDF-style
+# CONFIG_ESP_WIFI_ENABLED macro. Keep the HAL Wi-Fi clock helpers available
+# when NuttX enables the ESP32-S3 Wi-Fi adapter.
+ifeq ($(CONFIG_ESPRESSIF_WIFI),y)
+CFLAGS += ${DEFINE_PREFIX}CONFIG_ESP_WIFI_ENABLED=1
+endif
