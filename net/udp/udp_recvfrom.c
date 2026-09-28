@@ -741,7 +741,7 @@ ssize_t psock_udp_recvfrom(FAR struct socket *psock, FAR struct msghdr *msg,
    * NOTE: that udp_readahead() may set state.ir_recvlen == -1.
    */
 
-  else if (state.ir_recvlen <= 0)
+  else if (state.ir_recvlen < 0)
     {
       /* Set up the callback in the connection */
 
