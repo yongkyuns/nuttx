@@ -27,6 +27,8 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
+#include <limits.h>
+#include <stdbool.h>
 
 #include <nuttx/tls.h>
 
@@ -54,24 +56,56 @@ void tls_destruct(void)
 {
   FAR struct task_info_s *info = task_get_info();
   FAR struct tls_info_s *tls = tls_get_info();
-  FAR void *tls_elem_ptr = NULL;
+  FAR void *tls_elem_ptr;
   tls_dtor_t destructor;
   int candidate;
+  int iteration;
+  bool pending;
 
   DEBUGASSERT(info != NULL);
 
-  for (candidate = CONFIG_TLS_NELEM - 1; candidate >= 0; candidate--)
-    {
-      /* Is this candidate index available? */
+  /* POSIX permits a TLS destructor to associate another non-NULL value with
+   * the same key.  Clear each value before invoking its destructor, then
+   * repeat destruction while destructible values remain, up to the POSIX
+   * iteration limit.
+   */
 
-      tls_elem_ptr = (FAR void *)tls->tl_elem[candidate];
-      destructor = info->ta_tlsdtor[candidate];
-      if (tls_elem_ptr && destructor)
+  for (iteration = 0;
+       iteration < _POSIX_THREAD_DESTRUCTOR_ITERATIONS;
+       iteration++)
+    {
+      for (candidate = CONFIG_TLS_NELEM - 1; candidate >= 0; candidate--)
         {
-          destructor(tls_elem_ptr);
+          tls_elem_ptr = (FAR void *)tls->tl_elem[candidate];
+          destructor = info->ta_tlsdtor[candidate];
+
+          /* POSIX requires the key value to be NULL while its destructor is
+           * called.  The destructor may set a new value for a later pass.
+           */
+
+          tls->tl_elem[candidate] = 0;
+
+          if (tls_elem_ptr && destructor)
+            {
+              destructor(tls_elem_ptr);
+            }
         }
 
-      tls->tl_elem[candidate] = 0;
+      pending = false;
+      for (candidate = CONFIG_TLS_NELEM - 1; candidate >= 0; candidate--)
+        {
+          if (tls->tl_elem[candidate] != 0 &&
+              info->ta_tlsdtor[candidate] != NULL)
+            {
+              pending = true;
+              break;
+            }
+        }
+
+      if (!pending)
+        {
+          break;
+        }
     }
 }
 
