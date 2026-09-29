@@ -28,6 +28,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #include <nuttx/tls.h>
 
